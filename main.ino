@@ -1,4 +1,3 @@
-```cpp
 #include <LiquidCrystal.h>
 #include "DHT.h"
 
@@ -11,7 +10,7 @@ int led = 7;
 int fan = 10;
 int IRpin = 8;
 int lamp = 13;
-int co2Sensor = A1;
+int co2Pin = A1;  // Pin for CO2 sensor (MG811)
 char data = 0;
 
 void setup() {
@@ -22,38 +21,69 @@ void setup() {
   pinMode(fan, OUTPUT);
   pinMode(IRpin, INPUT);
   dht.begin();
-  lcd.begin(16, 2);
-  lcd.clear();
-  lcd.print("Monitoring...");
+  lcd.begin(16, 2);  // Adjust these numbers for your LCD size
+  lcd.clear();       // Clear the LCD initially
+  lcd.print("Temperature:");
 }
 
 void loop() {
+  // Read temperature from DHT sensor
   float t = dht.readTemperature();
-  int co2Level = analogRead(co2Sensor);
 
-  digitalWrite(buzzer, (t < 20 || t > 40 || co2Level > 800) ? HIGH : LOW);
-  digitalWrite(fan, (t > 35 || co2Level > 600) ? HIGH : LOW);
+  if (t < 20 || t > 40)
+    digitalWrite(buzzer, HIGH);
+  if (20 < t || t < 40)
+    digitalWrite(buzzer, LOW);
 
-  lcd.setCursor(0, 0);
-  lcd.print("Temp: ");
-  lcd.print(t);
-  lcd.print(" C  ");
+  if (t > 35)
+    digitalWrite(fan, HIGH);
+  if (t < 25)
+    digitalWrite(fan, LOW);
 
+  // Read CO2 sensor value (analog)
+  int co2Value = analogRead(co2Pin);
+  float co2Voltage = co2Value * (5.0 / 1023.0);  // Convert the analog value to voltage
+  
+  // Display CO2 voltage on LCD
   lcd.setCursor(0, 1);
   lcd.print("CO2: ");
-  lcd.print(co2Level);
-  lcd.print(" ppm  ");
+  lcd.print(co2Voltage, 2);  // Show voltage with 2 decimal places
 
-  int irValue = digitalRead(IRpin);
-  digitalWrite(led, irValue == 0 ? HIGH : LOW);
-
-  if (Serial.available() > 0) {
-    data = Serial.read();
-    digitalWrite(led, (data == '1') ? HIGH : (data == '0') ? LOW : digitalRead(led));
-    digitalWrite(lamp, (data == '2') ? HIGH : (data == '3') ? LOW : digitalRead(lamp));
-    digitalWrite(fan, (data == '4') ? HIGH : (data == '5') ? LOW : digitalRead(fan));
+  // If CO2 level is high, turn on buzzer and fan
+  if (co2Voltage > 3.0) {  // Threshold value for high CO2
+    digitalWrite(buzzer, HIGH);
+    digitalWrite(fan, HIGH);
+  } else {
+    digitalWrite(buzzer, LOW);
+    digitalWrite(fan, LOW);
   }
 
+  // Read IR sensor value
+  int irvalue = digitalRead(IRpin);
+  if (irvalue == 0) {
+    digitalWrite(led, HIGH);
+  } else {
+    digitalWrite(led, LOW);
+  }
+
+  // Check for incoming data from serial communication
+  if (Serial.available() > 0) {
+    data = Serial.read();
+    // Control components based on received data
+    if (data == '1')
+      digitalWrite(led, HIGH);
+    else if (data == '0')
+      digitalWrite(led, LOW);
+    else if (data == '3')
+      digitalWrite(lamp, LOW);
+    else if (data == '2')
+      digitalWrite(lamp, HIGH);
+    else if (data == '5')
+      digitalWrite(fan, LOW);
+    else if (data == '4')
+      digitalWrite(fan, HIGH);
+  }
+
+  // Add a delay to prevent rapid updates
   delay(1000);
 }
-```
